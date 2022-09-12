@@ -24,14 +24,15 @@ public class FileStorageService {
     @Value("${upload.folder}")
     private String uploadFolder;
 
+    private final Hashids hashids;
+
     public FileStorageService(FileStorageRepository fileStorageRepository) {
         this.fileStorageRepository = fileStorageRepository;
         this.hashids = new Hashids(getClass().getName(), 6);
+
     }
-    private final Hashids hashids;
 
-
-    public void save(MultipartFile multipartFile){
+    public void save(MultipartFile multipartFile) {
         FileStorage fileStorage = new FileStorage();
         fileStorage.setName(multipartFile.getOriginalFilename());
         fileStorage.setExtension(getExt(multipartFile.getOriginalFilename()));
@@ -41,23 +42,29 @@ public class FileStorageService {
         fileStorageRepository.save(fileStorage);
 
         Date now = new Date();
-        File uploadFolder = new File(String.format("%s/upload_files/%d/%d/%d", this.uploadFolder, 1900 + now.getYear(), 1 + now.getMonth(), now.getDay()));
-        if (!uploadFolder.exists() && uploadFolder.mkdir()){
-            System.out.println("Aytilgan papkalar yaratildi");
+        File uploadFolder = new File(String.format("%s/upload_files/%d/%d/%d/", this.uploadFolder,
+                1900 + now.getYear(), 1 + now.getMonth(), now.getDate()));
+        if (!uploadFolder.exists() && uploadFolder.mkdirs()){
+            System.out.println("aytilgan papkalar yaratildi");
         }
         fileStorage.setHashId(hashids.encode(fileStorage.getId()));
-        fileStorage.setUploadPath(String.format("upload_files/%d/%d/%d/%s.%s", 1900 + now.getYear(), 1 + now.getMonth(), now.getDay(), fileStorage.getHashId(), fileStorage.getExtension()));
+        fileStorage.setUploadPath(String.format("upload_files/%d/%d/%d/%s.%s",
+                1900 + now.getYear(),
+                1 + now.getMonth(),
+                now.getDate(),
+                fileStorage.getHashId(),
+                fileStorage.getExtension()));
         fileStorageRepository.save(fileStorage);
         uploadFolder = uploadFolder.getAbsoluteFile();
         File file = new File(uploadFolder, String.format("%s.%s", fileStorage.getHashId(), fileStorage.getExtension()));
-
-        try{
+        try {
             multipartFile.transferTo(file);
-        } catch (IOException e) {
+        } catch (IOException e){
             e.printStackTrace();
         }
 
     }
+
     @Transactional(readOnly = true)
     public FileStorage findByHashId(String hashId){
         return fileStorageRepository.findByHashId(hashId);
@@ -74,20 +81,17 @@ public class FileStorageService {
     @Scheduled(cron = "0 0 0 * * *")
     public void deleteAllDraft(){
         List<FileStorage> fileStorageList = fileStorageRepository.findAllByFileStorageStatus(FileStorageStatus.DRAFT);
-//        for (FileStorage fileStorage: fileStorageList){
-//            delete(fileStorage.getHashId());
-//        }
         fileStorageList.forEach(fileStorage -> {
             delete(fileStorage.getHashId());
         });
     }
 
-    private String getExt(String fileName){
+    private String getExt(String fileName) {
         String ext = null;
-        if (fileName != null && !fileName.isEmpty()){
-            int dot = fileName.lastIndexOf(".");
-            if (dot >0 && dot <= fileName.length()-2){
-                ext = fileName.substring(dot+1);
+        if (fileName != null && !fileName.isEmpty()) {
+            int dot = fileName.lastIndexOf('.');
+            if (dot > 0 && dot <= fileName.length() - 2) {
+                ext = fileName.substring(dot + 1);
             }
         }
         return ext;
